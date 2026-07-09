@@ -1,19 +1,25 @@
 package com.goMaddy.multithreaded_http_fileserver.entity;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.GenerationType;
 import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "files")
+@Table(name = "filess")
 public class FileMetadata {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
     private String originalFilename;
     private String storedFilename;
     private String contentType;
@@ -28,6 +34,12 @@ public class FileMetadata {
     }
     public void setId(UUID id) {
         this.id = id;
+    }
+    public User getUser() {
+    return user;
+    }
+    public void setUser(User user) {
+    this.user = user;
     }
     public String getOriginalFilename() {
         return originalFilename;

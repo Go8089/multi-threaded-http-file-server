@@ -1,4 +1,4 @@
-package com.goMaddy.multithreaded_http_fileserver.storage;
+package com.goMaddy.multithreaded_http_fileserver.service;
 
 import com.goMaddy.multithreaded_http_fileserver.exception.FileStorageException;
 import org.springframework.core.io.Resource;
@@ -12,9 +12,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.UUID;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
-import java.net.MalformedURLException;
 import java.util.stream.Stream;
 
 @Service
@@ -84,5 +81,9 @@ public class FileStorageService {
                 }
             });
         }
+    }
+    public Path getFilePath(String storedFilename) {
+
+        return storageLocation.resolve(storedFilename).normalize();
     }
 }

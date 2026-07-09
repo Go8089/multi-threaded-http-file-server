@@ -9,7 +9,8 @@ import com.goMaddy.multithreaded_http_fileserver.dto.AuthenticationResponse;
 import com.goMaddy.multithreaded_http_fileserver.dto.LoginRequest;
 import com.goMaddy.multithreaded_http_fileserver.entity.User;
 import com.goMaddy.multithreaded_http_fileserver.security.JwtService;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class AuthenticationService {
@@ -17,7 +18,7 @@ public class AuthenticationService {
     private final UserService userService;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
-
+    private static final Logger logger =  LoggerFactory.getLogger(AuthenticationService.class);
     public AuthenticationService(
             UserService userService,
             PasswordEncoder passwordEncoder,
@@ -30,15 +31,26 @@ public class AuthenticationService {
 
     @Transactional(readOnly = true)
     public AuthenticationResponse login(LoginRequest request) {
+    User user = userService.getUserByEmail(request.email());
 
-        User user = userService.getUserByEmail(request.email());
+if (!passwordEncoder.matches(request.password(), user.getPassword())) {
 
-        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
-            throw new BadCredentialsException("Invalid email or password");
-        }
+    logger.warn(
+        "Failed login attempt for email '{}'.",
+        request.email()
+    );
 
-        String token = jwtService.generateToken(user);
+    throw new BadCredentialsException("Invalid email or password");
+}
 
-        return new AuthenticationResponse(token);
+logger.info(
+    "User '{}' logged in successfully.",
+    user.getEmail()
+);
+
+String token = jwtService.generateToken(user);
+
+return new AuthenticationResponse(token);
+        
     }
 }

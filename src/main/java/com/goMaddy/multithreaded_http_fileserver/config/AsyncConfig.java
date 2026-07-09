@@ -8,8 +8,11 @@ import java.util.concurrent.Executors;
 @Configuration
 public class AsyncConfig {
     @Bean
-    public ExecutorService executorService() {
-        return Executors.newFixedThreadPool(4);
-    }
+public ExecutorService executorService(
+        ThreadPoolProperties properties) {
+    return Executors.newFixedThreadPool(
+            properties.getSize()
+    );
+}
 }
 

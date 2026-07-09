@@ -34,7 +34,7 @@ public class SpringConfig {
             .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/api/users/register",
-                                "/api/users/login"
+                                "/api/users/login", "/swagger-ui/**", "/v3/api-docs/**",  "/swagger-ui.html"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

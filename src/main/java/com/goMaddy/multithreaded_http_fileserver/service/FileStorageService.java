@@ -1,5 +1,6 @@
 package com.goMaddy.multithreaded_http_fileserver.service;
 
+import com.goMaddy.multithreaded_http_fileserver.config.StorageProperties;
 import com.goMaddy.multithreaded_http_fileserver.exception.FileStorageException;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -13,12 +14,18 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.UUID;
 import java.util.stream.Stream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class FileStorageService {
-    private final Path storageLocation = Paths.get("uploads");
-
-    public FileStorageService() throws IOException {
+    private final Path storageLocation;
+    private static final Logger logger = LoggerFactory.getLogger(FileStorageService.class);
+public FileStorageService(StorageProperties storageProperties)throws IOException {
+        this.storageLocation = Paths
+                .get(storageProperties.getPath())
+                .toAbsolutePath()
+                .normalize();
         Files.createDirectories(storageLocation);
     }
 
@@ -40,6 +47,8 @@ public class FileStorageService {
                 targetLocation,
                 StandardCopyOption.REPLACE_EXISTING
         );
+        logger.info(
+      "File stored successfully: {}", storedFilename);
         return storedFilename;
     }
     public Resource loadFile(String storedFilename) throws MalformedURLException {
@@ -53,6 +62,7 @@ public class FileStorageService {
     public void deleteFile(String storedFilename) throws IOException {
         Path filePath = storageLocation.resolve(storedFilename).normalize();
         Files.deleteIfExists(filePath);
+        logger.info("Deleted file: {}", storedFilename);
     }
     public Resource loadFileAsResource(String storedFilename)
             throws MalformedURLException {
@@ -81,6 +91,7 @@ public class FileStorageService {
                 }
             });
         }
+        logger.info("All uploaded files deleted.");
     }
     public Path getFilePath(String storedFilename) {
 

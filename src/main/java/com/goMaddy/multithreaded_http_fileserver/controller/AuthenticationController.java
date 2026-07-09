@@ -7,6 +7,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.goMaddy.multithreaded_http_fileserver.dto.LoginRequest;
 import com.goMaddy.multithreaded_http_fileserver.service.AuthenticationService;
+
+import jakarta.validation.Valid;
+
 import com.goMaddy.multithreaded_http_fileserver.dto.AuthenticationResponse;
 
 @RestController
@@ -19,7 +22,7 @@ private final AuthenticationService authenticationService;
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthenticationResponse> login(
+    public ResponseEntity<AuthenticationResponse> login(@Valid
             @RequestBody LoginRequest request) {
 
         return ResponseEntity.ok(authenticationService.login(request));

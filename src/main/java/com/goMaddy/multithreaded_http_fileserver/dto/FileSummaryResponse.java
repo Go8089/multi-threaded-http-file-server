@@ -7,4 +7,6 @@ public record FileSummaryResponse( UUID id,
         String originalFilename,
         String contentType,
         Long fileSize,
-        Instant uploadTime) {}
+        Instant uploadTime,
+        String downloadUrl
+) {}

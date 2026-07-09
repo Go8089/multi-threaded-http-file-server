@@ -1,5 +1,6 @@
 package com.goMaddy.multithreaded_http_fileserver.security;
 
+import com.goMaddy.multithreaded_http_fileserver.config.JwtProperties;
 import com.goMaddy.multithreaded_http_fileserver.entity.User;
 import io.jsonwebtoken.Claims;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -12,18 +13,20 @@ import java.util.function.Function;
 
 @Service
 public class JwtService {
-    private static final String SECRET = "THIS_IS_A_DEMO_SECRET_KEY_FOR_JWT_CHANGE_IN_PRODUCTION_123456789";
-    private static final long EXPIRATION = 1000 * 60 * 60; // 1 hour
+    private final JwtProperties jwtProperties;
+    public JwtService(JwtProperties jwtProperties) {
+    this.jwtProperties = jwtProperties;
+}
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(
-                SECRET.getBytes()
+                jwtProperties.getSecret().getBytes()
         );
     }
     public String generateToken(User user) {
         return Jwts.builder()
                 .subject(user.getEmail())
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + EXPIRATION))
+                .expiration(new Date(System.currentTimeMillis() + jwtProperties.getExpiration()))
                 .signWith(getSigningKey())
                 .compact();
     }

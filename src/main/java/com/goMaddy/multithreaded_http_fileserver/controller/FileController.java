@@ -2,11 +2,15 @@ package com.goMaddy.multithreaded_http_fileserver.controller;
 
 import com.goMaddy.multithreaded_http_fileserver.dto.DownloadFileResponse;
 import com.goMaddy.multithreaded_http_fileserver.dto.FileDetailsResponse;
+import com.goMaddy.multithreaded_http_fileserver.dto.FilePageResponse;
 import com.goMaddy.multithreaded_http_fileserver.dto.FileResponse;
 import com.goMaddy.multithreaded_http_fileserver.dto.FileSummaryResponse;
 import com.goMaddy.multithreaded_http_fileserver.dto.FileUploadResponse;
 import com.goMaddy.multithreaded_http_fileserver.entity.FileMetadata;
 import com.goMaddy.multithreaded_http_fileserver.service.FileService;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpHeaders;
@@ -28,6 +32,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @RestController
 @RequestMapping("/api/files")
 public class FileController {
+    private static final Logger logger = LoggerFactory.getLogger(FileController.class);
     private final FileService fileService;
     public FileController(FileService fileService) {
         this.fileService = fileService;
@@ -40,10 +45,13 @@ public class FileController {
         responseCode = "201",
         description = "File uploaded successfully"
 )    
-@PostMapping("/upload")
+@PostMapping(
+        value = "/upload",
+        consumes = MediaType.MULTIPART_FORM_DATA_VALUE
+)
 public ResponseEntity<FileUploadResponse> uploadFile(
             @RequestParam("file") MultipartFile file) throws IOException {
-        System.out.println("Thread = " + Thread.currentThread().getName());
+        logger.info("Upload request handled by thread: {}", Thread.currentThread().getName());
         FileUploadResponse savedFile = fileService.uploadFile(file);
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -72,7 +80,7 @@ public ResponseEntity<Resource> downloadFile(@PathVariable("id") UUID id)
         description = "Returns every file uploaded by the authenticated user."
 )    
 @GetMapping
-public ResponseEntity<Page<FileSummaryResponse>> getMyFiles(
+public ResponseEntity<FilePageResponse> getMyFiles(
         @RequestParam(defaultValue = "0")
         int page,
         @RequestParam(defaultValue = "10")

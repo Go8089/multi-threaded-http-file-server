@@ -36,7 +36,10 @@ logging:
 
   file:
     name: logs/file-server.log    
-
+servlet:
+  multipart:
+    max-file-size: 100MB
+    max-request-size: 100MB
 app:
   upload:
     path: uploads
@@ -47,3 +50,7 @@ app:
 
   thread-pool:
     size: 10  
+  rate-limit:
+    capacity: 50
+    refill-tokens: 50
+    refill-duration: 1  

@@ -1,5 +1,6 @@
 package com.goMaddy.multithreaded_http_fileserver.config;
 
+import com.goMaddy.multithreaded_http_fileserver.rateLimit.RateLimitFilter;
 import com.goMaddy.multithreaded_http_fileserver.security.JwtAuthenticationFilter;
 import com.goMaddy.multithreaded_http_fileserver.security.JwtService;
 import com.goMaddy.multithreaded_http_fileserver.service.UserService;
@@ -16,13 +17,16 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SpringConfig {
     private final JwtService jwtService;
     private final UserService userService;
+    private final RateLimitFilter rateLimitFilter;
     public SpringConfig(JwtService jwtService,
-                        UserService userService) {
+                        UserService userService,
+                        RateLimitFilter rateLimitFilter) {
         this.jwtService = jwtService;
         this.userService = userService;
+        this.rateLimitFilter = rateLimitFilter;
     }
     @Bean
-    public JwtAuthenticationFilter jwtAuthenticationFilter() {
+    public JwtAuthenticationFilter jwtAuthenticationFilter () {
         return new JwtAuthenticationFilter(jwtService, userService);
     }
     @Bean
@@ -38,10 +42,8 @@ public class SpringConfig {
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
-                .addFilterBefore(
-                        jwtAuthenticationFilter(),
-                        UsernamePasswordAuthenticationFilter.class
-                );
+                .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

@@ -33,14 +33,16 @@ services:
       - redis
     ports:
       - "8080:8080"
-
+    volumes:
+      - uploads:/safeNest/uploads    
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       APP_JWT_SECRET: ${JWT_SECRET}
       APP_JWT_EXPIRATION: ${JWT_EXPIRATION}
-        
+    
 
 volumes:
   postgres_data:
+  uploads:

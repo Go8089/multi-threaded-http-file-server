@@ -1,9 +1,8 @@
 package com.goMaddy.multithreaded_http_fileserver.service;
 
-import com.goMaddy.multithreaded_http_fileserver.config.CacheNames;
 import com.goMaddy.multithreaded_http_fileserver.dto.DownloadFileResponse;
 import com.goMaddy.multithreaded_http_fileserver.dto.FileDetailsResponse;
-import com.goMaddy.multithreaded_http_fileserver.dto.FileResponse;
+import com.goMaddy.multithreaded_http_fileserver.dto.FilePageResponse;
 import com.goMaddy.multithreaded_http_fileserver.dto.FileSummaryResponse;
 import com.goMaddy.multithreaded_http_fileserver.dto.FileUploadResponse;
 import com.goMaddy.multithreaded_http_fileserver.entity.FileMetadata;
@@ -19,7 +18,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,9 +31,7 @@ import java.util.concurrent.ExecutorService;
 import org.springframework.context.ApplicationEventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
-import org.springframework.cache.annotation.Caching;
+
 @Service
 public class FileService {
         private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
@@ -59,11 +55,6 @@ public class FileService {
         this.eventPublisher = eventPublisher;
 
     }
-    @Caching(evict = {
-        @CacheEvict(
-                value = CacheNames.FILES,
-                key = "userKeyGenerator")
-})
     @Transactional
     public FileUploadResponse uploadFile(MultipartFile file) throws IOException {
         logger.info("[{}] Upload started: {}", Thread.currentThread().getName(), file.getOriginalFilename());
@@ -110,24 +101,24 @@ public class FileService {
                 contentLength
         );
     }
-@Cacheable(
-        value = CacheNames.FILES,
-        key = "userKeyGenerator"
-  )
    @Transactional(readOnly = true)
-    public Page<FileSummaryResponse> getMyFiles( int page, int size, String sortBy, String direction,  String filename, String contentType) {
-    User currentUser = getCurrentUser();
+    public FilePageResponse getMyFiles( int page, int size, String sortBy, String direction,  String filename, String contentType) {
+      logger.info("Loading file list from PostgreSQL");
+        User currentUser = getCurrentUser();
      if (!ALLOWED_SORT_FIELDS.contains(sortBy)) {
         throw new IllegalArgumentException(
                 "Invalid sort field: " + sortBy
         );
     }
     Sort.Direction sortDirection =
-        direction.equalsIgnoreCase("asc")
-                ? Sort.Direction.ASC
-                : Sort.Direction.DESC;
-
-    Pageable pageable = PageRequest.of( page, size, Sort.by("uploadTime").descending());
+    direction.equalsIgnoreCase("asc")
+        ? Sort.Direction.ASC
+        : Sort.Direction.DESC;
+    Pageable pageable = PageRequest.of(
+    page,
+    size,
+    Sort.by(sortDirection, sortBy)
+);
    Specification<FileMetadata> specification =
         FileSpecification.hasUser(currentUser);
 
@@ -150,23 +141,38 @@ Page<FileMetadata> files =
                 specification,
                 pageable
         );
-return files.map(file -> new FileSummaryResponse(
-        file.getId(),
-        file.getOriginalFilename(),
-        file.getContentType(),
-        file.getFileSize(),
-        file.getUploadTime(),
-        "/api/files/" + file.getId() + "/download"));
+List<FileSummaryResponse> response =
+
+        files.getContent()
+                .stream()
+                .map(file -> new FileSummaryResponse(
+                        file.getId(),
+                        file.getOriginalFilename(),
+                        file.getContentType(),
+                        file.getFileSize(),
+                        file.getUploadTime(),
+                        "/api/files/" + file.getId() + "/download"
+                ))
+                .toList();
+
+return new FilePageResponse(
+
+        response,
+
+        files.getNumber(),
+
+        files.getSize(),
+
+        files.getTotalElements(),
+
+        files.getTotalPages(),
+
+        files.isFirst(),
+
+        files.isLast()
+
+);
 }
-   @Caching(evict = {
-        @CacheEvict(
-                value = CacheNames.FILE_DETAILS,
-                key = "#id"
-        ),
-        @CacheEvict(
-                value = CacheNames.FILES,
-                key = "userKeyGenerator")
-})
     @Transactional
     public void deleteFile(UUID id) throws IOException {
         FileMetadata metadata = getUserFile(id);
@@ -186,10 +192,6 @@ return files.map(file -> new FileSummaryResponse(
 );
     }*/
 
-@Cacheable(
-        value = CacheNames.FILE_DETAILS,
-        key = "#id"
-)
 @Transactional(readOnly = true)
 public FileDetailsResponse getFileDetails(UUID id) {
 

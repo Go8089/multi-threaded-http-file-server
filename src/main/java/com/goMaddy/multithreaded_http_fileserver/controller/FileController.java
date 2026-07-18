@@ -8,9 +8,11 @@ import com.goMaddy.multithreaded_http_fileserver.dto.FileSummaryResponse;
 import com.goMaddy.multithreaded_http_fileserver.dto.FileUploadResponse;
 import com.goMaddy.multithreaded_http_fileserver.entity.FileMetadata;
 import com.goMaddy.multithreaded_http_fileserver.service.FileService;
+import com.goMaddy.multithreaded_http_fileserver.service.FileStorageService;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpHeaders;
@@ -26,6 +28,8 @@ import java.util.UUID;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import software.amazon.awssdk.core.ResponseInputStream;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 @Tag(
     name = "File APIs",
     description = "Upload, download and manage files")
@@ -34,8 +38,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 public class FileController {
     private static final Logger logger = LoggerFactory.getLogger(FileController.class);
     private final FileService fileService;
-    public FileController(FileService fileService) {
+    private final FileStorageService fileStorageService;
+    public FileController(FileService fileService, FileStorageService fileStorageService) {
         this.fileService = fileService;
+        this.fileStorageService = fileStorageService;
     }
 @Operation(
         summary = "Upload a file",
@@ -64,16 +70,19 @@ public ResponseEntity<FileUploadResponse> uploadFile(
 @GetMapping("/{id}/download")
 public ResponseEntity<Resource> downloadFile(@PathVariable("id") UUID id)
             throws IOException {
-        DownloadFileResponse response = fileService.downloadFile(id);
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(response.contentType()))
-                .contentLength(response.contentLength())
-                .header(
-                        HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"" +
-                                response.originalFilename() + "\""
-                )
-                .body(response.resource());
+        FileMetadata metadata = new FileMetadata();
+        ResponseInputStream<GetObjectResponse> inputStream =
+        fileStorageService.loadFile(metadata.getStoredFilename());
+
+return ResponseEntity.ok()
+        .contentType(MediaType.parseMediaType(
+                fileStorageService.getContentType(
+                        metadata.getStoredFilename())))
+        .header(
+                HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename=\"" +
+                        metadata.getOriginalFilename() + "\"")
+        .body(new InputStreamResource(inputStream));
     }
 @Operation(
         summary = "List my files",
@@ -120,4 +129,10 @@ public ResponseEntity<FileDetailsResponse> getFileDetails(
                 fileService.getFileDetails(id)
         );
     }
+    @GetMapping("/download")
+public ResponseEntity<Resource> downloadByToken(
+        @RequestParam String token) throws IOException {
+
+    return fileService.downloadByToken(token);
+}
 }

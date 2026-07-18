@@ -4,6 +4,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.UUID;
 
 @Service
@@ -17,7 +18,7 @@ public class DownloadTokenService {
         this.redisTemplate = redisTemplate;
     }
 
-    public String generateToken(UUID fileId, Long userId) {
+    public String generateToken(UUID fileId, UUID userId) {
 
         String token = UUID.randomUUID().toString();
 
@@ -41,4 +42,7 @@ public class DownloadTokenService {
 
         redisTemplate.delete("download:" + token);
     }
+    public Instant getExpiryTime() {
+    return Instant.now().plus(TOKEN_TTL);
+}
 }

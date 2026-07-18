@@ -1,6 +1,7 @@
 package com.goMaddy.multithreaded_http_fileserver.service;
 
 import com.goMaddy.multithreaded_http_fileserver.dto.DownloadFileResponse;
+import com.goMaddy.multithreaded_http_fileserver.dto.DownloadTokenResponse;
 import com.goMaddy.multithreaded_http_fileserver.dto.FileDetailsResponse;
 import com.goMaddy.multithreaded_http_fileserver.dto.FilePageResponse;
 import com.goMaddy.multithreaded_http_fileserver.dto.FileSummaryResponse;
@@ -17,6 +18,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -44,15 +48,17 @@ public class FileService {
     private final ExecutorService executorService;
     private final ChecksumService checksumService;
     private final ApplicationEventPublisher eventPublisher;
+    private final DownloadTokenService downloadTokenService;
     private static final Logger logger = LoggerFactory.getLogger(FileService.class);
     public FileService(FileRepository fileRepository,
                        FileStorageService fileStorageService, ExecutorService executorService,
-                       ChecksumService checksumService, ApplicationEventPublisher eventPublisher) {
+                       ChecksumService checksumService, ApplicationEventPublisher eventPublisher, DownloadTokenService downloadTokenService) {
         this.fileRepository = fileRepository;
         this.fileStorageService = fileStorageService;
         this.executorService = executorService;
         this.checksumService = checksumService;
         this.eventPublisher = eventPublisher;
+        this.downloadTokenService = downloadTokenService;
 
     }
     @Transactional
@@ -91,7 +97,7 @@ public class FileService {
        FileMetadata metadata = getUserFile(id);
         Resource resource = fileStorageService.loadFileAsResource(
                 metadata.getStoredFilename());
-        String contentType = fileStorageService.getContentType(resource);
+        String contentType = fileStorageService.getContentType(metadata.getStoredFilename());
         long contentLength = resource.contentLength();
         logger.info( "Downloading file {}", metadata.getOriginalFilename());
         return new DownloadFileResponse(
@@ -228,5 +234,66 @@ public FileDetailsResponse getFileDetails(UUID id) {
     }
     public static Specification<FileMetadata> hasChecksum(String checksum){
     return (root, query, cb) ->  cb.equal(root.get("checksum"), checksum); }
-     
+     @Transactional(readOnly = true)
+public DownloadTokenResponse generateDownloadToken(UUID fileId) {
+
+    User currentUser = getCurrentUser();
+
+    FileMetadata file = fileRepository.findById(fileId)
+            .orElseThrow(() ->
+                    new ResourceNotFoundException("File not found."));
+
+    if (!file.getUser().getId().equals(currentUser.getId())) {
+        throw new AccessDeniedException(
+                "You are not allowed to access this file.");
+    }
+
+    
+
+   String token = downloadTokenService.generateToken(
+        file.getId(),
+        currentUser.getId()
+    );
+    return new DownloadTokenResponse(
+            token,
+            downloadTokenService.getExpiryTime()
+    );
+}
+@Transactional(readOnly = true)
+public ResponseEntity<Resource> downloadByToken(String token)
+        throws IOException {
+
+    String tokenData = downloadTokenService.getTokenData(token);
+
+    if (tokenData == null) {
+        throw new ResourceNotFoundException(
+                "Download token is invalid or expired.");
+    }
+
+    String[] parts = tokenData.split(":");
+
+    UUID fileId = UUID.fromString(parts[0]);
+
+    FileMetadata metadata = fileRepository.findById(fileId)
+            .orElseThrow(() ->
+                    new ResourceNotFoundException("File not found."));
+
+    Resource resource =
+            fileStorageService.loadFileAsResource(
+                    metadata.getStoredFilename());
+
+    String contentType =
+            fileStorageService.getContentType(metadata.getStoredFilename());
+
+    // Single-use token
+    downloadTokenService.deleteToken(token);
+
+    return ResponseEntity.ok()
+            .contentType(MediaType.parseMediaType(contentType))
+            .header(
+                    HttpHeaders.CONTENT_DISPOSITION,
+                    "attachment; filename=\"" +
+                            metadata.getOriginalFilename() + "\"")
+            .body(resource);
+}
 }

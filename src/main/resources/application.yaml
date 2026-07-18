@@ -40,6 +40,10 @@ servlet:
   multipart:
     max-file-size: 100MB
     max-request-size: 100MB
+aws:
+  s3:
+    bucket: ${AWS_BUCKET_NAME}
+    region: ${AWS_REGION}    
 app:
   upload:
     path: uploads

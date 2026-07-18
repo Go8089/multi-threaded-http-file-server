@@ -1,7 +1,18 @@
 package com.goMaddy.multithreaded_http_fileserver.service;
 
+import com.goMaddy.multithreaded_http_fileserver.config.AwsS3Properties;
 import com.goMaddy.multithreaded_http_fileserver.config.StorageProperties;
 import com.goMaddy.multithreaded_http_fileserver.exception.FileStorageException;
+
+import software.amazon.awssdk.core.ResponseInputStream;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
@@ -19,46 +30,75 @@ import org.slf4j.LoggerFactory;
 
 @Service
 public class FileStorageService {
+    private final S3Client s3Client;
+    private final AwsS3Properties properties;
     private final Path storageLocation;
-    private static final Logger logger = LoggerFactory.getLogger(FileStorageService.class);
-public FileStorageService(StorageProperties storageProperties)throws IOException {
-        this.storageLocation = Paths
-                .get(storageProperties.getPath())
-                .toAbsolutePath()
-                .normalize();
-        Files.createDirectories(storageLocation);
+
+private static final Logger logger =
+        LoggerFactory.getLogger(FileStorageService.class);
+
+public FileStorageService(
+        S3Client s3Client,
+        AwsS3Properties properties,
+         StorageProperties storageProperties
+) throws IOException {
+    this.s3Client = s3Client;
+    this.properties = properties;
+    this.storageLocation = Paths
+            .get(storageProperties.getPath())
+            .toAbsolutePath()
+            .normalize();
+    Files.createDirectories(storageLocation);
+}
+
+public String saveFile(MultipartFile file)
+        throws IOException {
+
+    if (file.isEmpty()) {
+        throw new FileStorageException("File is empty.");
     }
 
-    public String saveFile(MultipartFile file) throws IOException {
-        if (file.isEmpty()) {
-            throw new FileStorageException("File is empty.");
-        }
-        String originalFilename = file.getOriginalFilename();
-        if (originalFilename == null || originalFilename.isBlank()) {
-            throw new FileStorageException("Invalid filename.");
-        }
-        if (originalFilename.contains("..")) {
-            throw new FileStorageException("Invalid filename.");
-        }
-        String storedFilename = UUID.randomUUID() + "_" + originalFilename;
-        Path targetLocation = storageLocation.resolve(storedFilename);
-        Files.copy(
-                file.getInputStream(),
-                targetLocation,
-                StandardCopyOption.REPLACE_EXISTING
-        );
-        logger.info(
-      "File stored successfully: {}", storedFilename);
-        return storedFilename;
+    String originalFilename = file.getOriginalFilename();
+
+    if (originalFilename == null || originalFilename.isBlank()) {
+        throw new FileStorageException("Invalid filename.");
     }
-    public Resource loadFile(String storedFilename) throws MalformedURLException {
-        Path filePath = storageLocation.resolve(storedFilename).normalize();
-        Resource resource = new UrlResource(filePath.toUri());
-        if (resource.exists() && resource.isReadable()) {
-            return resource;
-        }
-        throw new RuntimeException("File not found.");
-    }
+
+    String storedFilename =
+            UUID.randomUUID() + "_" + originalFilename;
+
+    PutObjectRequest request =
+            PutObjectRequest.builder()
+                    .bucket(properties.getBucket())
+                    .key(storedFilename)
+                    .contentType(file.getContentType())
+                    .build();
+
+    s3Client.putObject(
+            request,
+            RequestBody.fromInputStream(
+                    file.getInputStream(),
+                    file.getSize()
+            )
+    );
+
+    logger.info(
+            "Uploaded {} to S3",
+            storedFilename
+    );
+
+    return storedFilename;
+}   
+public ResponseInputStream<GetObjectResponse> loadFile(String storedFilename) {
+
+    GetObjectRequest request =
+            GetObjectRequest.builder()
+                    .bucket(properties.getBucket())
+                    .key(storedFilename)
+                    .build();
+
+    return s3Client.getObject(request);
+}    
     public void deleteFile(String storedFilename) throws IOException {
         Path filePath = storageLocation.resolve(storedFilename).normalize();
         Files.deleteIfExists(filePath);
@@ -73,14 +113,19 @@ public FileStorageService(StorageProperties storageProperties)throws IOException
         }
         throw new FileStorageException("File not found.");
     }
-    public String getContentType(Resource resource) throws IOException {
-        Path path = resource.getFile().toPath();
-        String contentType = Files.probeContentType(path);
-        if (contentType == null) {
-            contentType = "application/octet-stream";
-        }
-        return contentType;
-    }
+public String getContentType(String storedFilename) {
+
+    HeadObjectRequest request =
+            HeadObjectRequest.builder()
+                    .bucket(properties.getBucket())
+                    .key(storedFilename)
+                    .build();
+
+    HeadObjectResponse response =
+            s3Client.headObject(request);
+
+    return response.contentType();
+}
     public void deleteAllFiles() throws IOException {
         try (Stream<Path> files = Files.list(storageLocation)) {
             files.forEach(path -> {

@@ -1,0 +1,9 @@
+package com.goMaddy.multithreaded_http_fileserver.dto;
+
+import java.io.Serializable;
+import java.util.UUID;
+
+public record DownloadTokenData(
+        UUID fileId,
+        UUID userId
+) implements Serializable {}

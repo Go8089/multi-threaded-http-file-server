@@ -2,6 +2,7 @@ package com.goMaddy.multithreaded_http_fileserver.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+
 @ConfigurationProperties(prefix = "aws.s3")
 public class AwsS3Properties {
 
